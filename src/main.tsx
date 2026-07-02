@@ -20,11 +20,32 @@ const publicClient = createPublicClient({
     transport: http()
 });
 
-// this is the user wallet client
-const walletClient = createWalletClient({
-    chain: sepolia,
-    transport: custom(window.ethereum!),
-});
+// this is the user wallet client.
+// created lazily (only when we actually need it) so that a missing or
+// not-yet-injected window.ethereum — e.g. MetaMask still loading, disabled for
+// this site, or a browser without a wallet — doesn't crash the whole app at
+// startup and leave a blank page.
+// wrapped in a function so its return type keeps the concrete `chain: sepolia`
+// binding (which sendTransaction relies on), and so window.ethereum is only
+// touched when we actually build the client.
+function newWalletClient() {
+    return createWalletClient({
+        chain: sepolia,
+        transport: custom(window.ethereum!),
+    });
+}
+let walletClient: ReturnType<typeof newWalletClient> | undefined;
+function getWalletClient() {
+    if (!window.ethereum) {
+        throw new Error(
+            'No Ethereum wallet detected. Install MetaMask, switch it to the Sepolia network, then reload.',
+        );
+    }
+    if (!walletClient) {
+        walletClient = newWalletClient();
+    }
+    return walletClient;
+}
 
 // now we're connected to sepolia testnet, we can hcoose a smart contract to connect to USDC
 const USDC_CONTRACT_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
@@ -50,13 +71,19 @@ function Example() {
     const [account, setAccount] = useState<Address>();
     const [hash, setHash] = useState<Hash>();
     const [receipt, setReceipt] = useState<TransactionReceipt>();
+    const [error, setError] = useState<string>();
 
     const addressInput = React.createRef<HTMLInputElement>();
     const valueInput = React.createRef<HTMLInputElement>();
 
     const connect = async () => {
-        const [address] = await walletClient.requestAddresses();
-        setAccount(address);
+        try {
+            const [address] = await getWalletClient().requestAddresses();
+            setAccount(address);
+            setError(undefined);
+        } catch (e) {
+            setError((e as Error).message);
+        }
     };
 
     // now that we're connect we can define a function that sends USDC
@@ -72,7 +99,7 @@ function Example() {
             args: [to, valueInWei],
         });
 
-        const hash = await walletClient.sendTransaction({
+        const hash = await getWalletClient().sendTransaction({
             account,
             to: USDC_CONTRACT_ADDRESS,
             data,
@@ -104,7 +131,12 @@ function Example() {
             </>
         )
     }
-    return <button onClick={connect}>Connect Wallet</button>;
+    return (
+        <>
+            <button onClick={connect}>Connect Wallet</button>
+            {error && <p role="alert">{error}</p>}
+        </>
+    );
 }
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

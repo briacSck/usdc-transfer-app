@@ -4,7 +4,6 @@ import {
     http,
     type Address,
     type Hash,
-    type transactionReceipt,
     createPublicClient,
     custom,
     stringify,
@@ -13,7 +12,7 @@ import {
     TransactionReceipt,
 } from 'viem';
 import { sepolia } from 'viem/chains';
-import 'view/window';
+import 'viem/window';
 
 // this is the poublic client; so here we choose the chain etc
 const publicClient = createPublicClient({
@@ -34,9 +33,9 @@ const USDC_CONTRACT_ADDRESS = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
 // it defines the way for viem to decode and encode smart contract function calls
 const USDC_ABI = [
     {
-        constant = false,
+        constant: false,
         inputs: [
-            { name: '_to', type: 'address' }; // address on which to send the funds
+            { name: '_to', type: 'address' }, // address on which to send the funds
             { name: '_value', type: 'uint256' }, // ie the number of usdc to send
         ],
         name: 'transfer',
@@ -71,7 +70,7 @@ function Example() {
             abi: USDC_ABI,
             functionName: 'transfer',
             args: [to, valueInWei],
-        }),
+        });
 
         const hash = await walletClient.sendTransaction({
             account,
